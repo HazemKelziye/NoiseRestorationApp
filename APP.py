@@ -1,6 +1,5 @@
 import sys
 import os
-import numpy as np
 from NoiseRestoration.filters import noise_gaussian, median_filter
 from PyQt5.QtWidgets import QMainWindow, QStatusBar, QApplication, QLabel, QRadioButton, QListWidget, QListWidgetItem, QStatusBar, QVBoxLayout
 from PyQt5 import QtGui, uic
@@ -18,9 +17,7 @@ class NoiseRestorationAPP(QMainWindow):
         super().__init__()
         uic.loadUi('APP.ui', self)
 
-
         # main variables
-        self.current_item = QListWidgetItem
         self.img_width = int(app.primaryScreen().size().width()/2 - 200)
         self.img_height = int(app.primaryScreen().size().height()/2 - 20)
 
