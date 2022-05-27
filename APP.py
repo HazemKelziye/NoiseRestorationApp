@@ -1,7 +1,8 @@
 import sys
 import os
-from NoiseRestoration.filters import noise_gaussian, noise_gamma, noise_rayleigh, noise_uniform, noise_exponential, noise_salt_pepper, median_filter
-from PyQt5.QtWidgets import QMainWindow, QApplication, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QButtonGroup, QSlider
+from filters import noise_gaussian, noise_gamma, noise_rayleigh, noise_uniform, noise_exponential, noise_salt_pepper
+from filters import median_filter, gaussian_filter, bilateral_filter, arithmatic_mean_filter, max_filter, min_filter
+from PyQt5.QtWidgets import QMainWindow, QApplication, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QButtonGroup, QSlider, QFileDialog, QPushButton
 from PyQt5 import QtGui, uic
 from PyQt5.QtGui import QImage, QPixmap
 import cv2 as cv
@@ -15,6 +16,7 @@ def cv2qim(image):
 
 class NoiseRestorationAPP(QMainWindow):
     noise_signal = pyqtSignal(int, int, int)
+    restored_signal = pyqtSignal(int, int, int)
 
     def __init__(self):
         super().__init__()
@@ -33,22 +35,56 @@ class NoiseRestorationAPP(QMainWindow):
         self.restored_label = self.findChild(QLabel, 'restored_label')
         self.images_layout = self.findChild(QVBoxLayout, 'images_layout')
         self.noise_radio_group = self.findChild(QButtonGroup, 'noise_radio_group')
+        self.filter_radio_group = self.findChild(QButtonGroup, 'filter_radio_group')
         self.noiseProp1_label = self.findChild(QLabel, 'noiseProp1_label')
         self.noiseProp2_label = self.findChild(QLabel, 'noiseProp2_label')
         self.noiseProp1_slider = self.findChild(QSlider, 'noiseProp1_slider')
         self.noiseProp2_slider = self.findChild(QSlider, 'noiseProp2_slider')
         self.prop1Value_label = self.findChild(QLabel, 'prop1Value_label')
         self.prop2Value_label = self.findChild(QLabel, 'prop2Value_label')
+        self.filterProp1_label = self.findChild(QLabel, 'filterProp1_label')
+        self.filterProp2_label = self.findChild(QLabel, 'filterProp2_label')
+        self.filterProp3_label = self.findChild(QLabel, 'filterProp3_label')
+        self.filterPropDisp1_label = self.findChild(QLabel, 'filterPropDisp1_label')
+        self.filterPropDisp2_label = self.findChild(QLabel, 'filterPropDisp2_label')
+        self.filterPropDisp3_label = self.findChild(QLabel, 'filterPropDisp3_label')
+        self.filterProp1_slider = self.findChild(QSlider, 'filterProp1_slider')
+        self.filterProp2_slider = self.findChild(QSlider, 'filterProp2_slider')
+        self.filterProp3_slider = self.findChild(QSlider, 'filterProp3_slider')
+        self.browse_button = self.findChild(QPushButton, 'browse_button')
 
         # connecting signals
         self.images_list.itemClicked.connect(self.update_original)
         self.noise_radio_group.idClicked.connect(self.update_noise_gui)
+        self.filter_radio_group.idClicked.connect(self.update_restored_gui)
         self.noise_signal.connect(self.update_noisy)
+        self.restored_signal.connect(self.update_restored)
         self.noiseProp1_slider.valueChanged.connect(self.noise_slider_moved)
         self.noiseProp2_slider.valueChanged.connect(self.noise_slider_moved)
+        self.filterProp1_slider.valueChanged.connect(self.restored_slider_moved)
+        self.filterProp2_slider.valueChanged.connect(self.restored_slider_moved)
+        self.filterProp3_slider.valueChanged.connect(self.restored_slider_moved)
+        self.browse_button.clicked.connect(self.load)
 
         # initial functions
         self.populate_list("images\\")
+
+    def update_original(self):
+        item = self.images_list.currentItem()
+
+        image = item.data(Qt.UserRole)
+        q_image = cv2qim(image)
+        if q_image.height() > self.img_height:
+            q_image = q_image.scaledToHeight(self.img_height)
+
+        self.original_label.setPixmap(QPixmap(q_image))
+        self.noise_slider_moved()
+
+    def noise_slider_moved(self):
+        filter = self.noise_radio_group.checkedId()
+        prop1 = self.noiseProp1_slider.sliderPosition()
+        prop2 = self.noiseProp2_slider.sliderPosition()
+        self.noise_signal.emit(filter, prop1, prop2)
 
     def update_noise_gui(self, button):
 
@@ -149,23 +185,6 @@ class NoiseRestorationAPP(QMainWindow):
             prop2 = self.noiseProp2_slider.sliderPosition()
             self.noise_signal.emit(-2, prop1, prop2)
 
-    def noise_slider_moved(self):
-        filter = self.noise_radio_group.checkedId()
-        prop1 = self.noiseProp1_slider.sliderPosition()
-        prop2 = self.noiseProp2_slider.sliderPosition()
-        self.noise_signal.emit(filter, prop1, prop2)
-
-    def update_original(self):
-        item = self.images_list.currentItem()
-
-        image = item.data(Qt.UserRole)
-        q_image = cv2qim(image)
-        if q_image.height() > self.img_height:
-            q_image = q_image.scaledToHeight(self.img_height)
-
-        self.original_label.setPixmap(QPixmap(q_image))
-        self.noise_slider_moved()
-
     def update_noisy(self, noise_filter, prop1, prop2):
         original = self.images_list.currentItem().data(Qt.UserRole)
 
@@ -205,13 +224,162 @@ class NoiseRestorationAPP(QMainWindow):
             q_image = q_image.scaledToHeight(self.img_height)
 
         self.noisy_label.setPixmap(QPixmap(q_image))
-        #self.update_restored()
+        self.noisy = noisy
+        self.restored_slider_moved()
+
+    def restored_slider_moved(self):
+        prop1 = self.filterProp1_slider.sliderPosition()
+        prop2 = self.filterProp2_slider.sliderPosition()
+        prop3 = self.filterProp3_slider.sliderPosition()
+        self.restored_signal.emit(prop1, prop2, prop3)
+
+    def update_restored_gui(self, button):
+        # Median
+        if button == -3:
+            self.filterPropDisp1_label.setText("K size")
+            self.filterProp1_slider.setRange(1, 50)
+
+            self.filterPropDisp2_label.hide()
+            self.filterProp2_label.hide()
+            self.filterProp2_slider.hide()
+
+            self.filterPropDisp3_label.hide()
+            self.filterProp3_label.hide()
+            self.filterProp3_slider.hide()
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            self.restored_signal.emit(prop1, prop2, prop3)
+
+        # Gaussian
+        elif button == -2:
+            self.filterPropDisp1_label.setText("Radius =")
+            self.filterProp1_slider.setRange(0, 100)
+            self.filterProp1_slider.setTickInterval(1)
+
+            self.filterPropDisp2_label.hide()
+            self.filterProp2_label.hide()
+            self.filterProp2_slider.hide()
+
+            self.filterPropDisp3_label.hide()
+            self.filterProp3_label.hide()
+            self.filterProp3_slider.hide()
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            self.restored_signal.emit(prop1, prop2, prop3)
+
+        # Arithmetic mean
+        elif button == -4:
+            self.filterPropDisp1_label.setText("K size =")
+            self.filterProp1_slider.setRange(1, 2)
+
+            self.filterPropDisp2_label.hide()
+            self.filterProp2_label.hide()
+            self.filterProp2_slider.hide()
+
+            self.filterPropDisp3_label.hide()
+            self.filterProp3_label.hide()
+            self.filterProp3_slider.hide()
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            self.restored_signal.emit(prop1, prop2, prop3)
+
+        # Bilateral
+        elif button == -7:
+            self.filterPropDisp1_label.setText("d =")
+            self.filterProp1_slider.setRange(1, 20)
+
+            self.filterPropDisp2_label.show()
+            self.filterProp2_label.show()
+            self.filterProp2_slider.show()
+            self.filterPropDisp2_label.setText("Sigma color =")
+            self.filterProp2_slider.setRange(1, 20)
+
+            self.filterPropDisp3_label.show()
+            self.filterProp3_label.show()
+            self.filterProp3_slider.show()
+            self.filterPropDisp3_label.setText("Sigma space =")
+            self.filterProp3_slider.setRange(1, 20)
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            #self.restored_signal.emit(prop1, prop2, prop3)
+
+        # Max
+        elif button == -6:
+            self.filterPropDisp1_label.setText("K size =")
+            self.filterProp1_slider.setRange(1, 5)
+
+            self.filterPropDisp2_label.hide()
+            self.filterProp2_label.hide()
+            self.filterProp2_slider.hide()
+
+            self.filterPropDisp3_label.hide()
+            self.filterProp3_label.hide()
+            self.filterProp3_slider.hide()
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            self.restored_signal.emit(prop1, prop2, prop3)
+
+        # Min
+        elif button == -5:
+            self.filterPropDisp1_label.setText("K size =")
+            self.filterProp1_slider.setRange(1, 5)
+
+            self.filterPropDisp2_label.hide()
+            self.filterProp2_label.hide()
+            self.filterProp2_slider.hide()
+
+            self.filterPropDisp3_label.hide()
+            self.filterProp3_label.hide()
+            self.filterProp3_slider.hide()
+
+            prop1 = self.filterProp1_slider.sliderPosition()
+            prop2 = self.filterProp2_slider.sliderPosition()
+            prop3 = self.filterProp3_slider.sliderPosition()
+            self.restored_signal.emit(prop1, prop2, prop3)
 
     def update_restored(self, prop1, prop2, prop3):
-        self.noisy = self.images_list.currentItem().data(7)
+        filterIndex = self.filter_radio_group.checkedId()
 
-        restored = median_filter(self.noisy, 5)
-        self.images_list.currentItem().setData(8, restored)
+        if filterIndex == -3:
+            prop1 = 2 * prop1 + 1
+            self.filterProp1_label.setText(str(prop1))
+            restored = median_filter(self.noisy, prop1)
+
+        elif filterIndex == -2:
+            self.filterProp1_label.setText(str(prop1))
+            restored = gaussian_filter(self.noisy, prop1)
+
+        elif filterIndex == -7:
+            prop1 *= 5
+            prop2 *= 5
+            self.filterProp1_label.setText(str(prop1))
+            self.filterProp2_label.setText(str(prop2))
+            self.filterProp3_label.setText(str(prop3))
+            restored = bilateral_filter(self.noisy, prop1, prop2, prop3)
+
+        elif filterIndex == -6:
+            prop1 = 2*prop1 + 1
+            restored = max_filter(self.noisy, prop1)
+
+        elif filterIndex == -4:
+            prop1 = 2 * prop1 + 1
+            self.filterProp1_label.setText(str(prop1))
+            restored = arithmatic_mean_filter(self.noisy, prop1)
+
+        elif filterIndex == -5:
+            prop1 = 2*prop1 + 1
+            self.filterProp1_label.setText(str(prop1))
+            restored = min_filter(self.noisy, prop1)
 
         q_image = cv2qim(restored)
         if q_image.width() > self.img_width:
@@ -241,9 +409,14 @@ class NoiseRestorationAPP(QMainWindow):
         self.noise_signal.emit(-2, 0, 0)
         self.showMaximized()
 
+    def load(self):
+        file = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        self.populate_list(file)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     demo = NoiseRestorationAPP()
     demo.show()
     sys.exit(app.exec_())
+
+

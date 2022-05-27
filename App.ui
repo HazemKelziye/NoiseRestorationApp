@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>910</width>
-    <height>801</height>
+    <height>845</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -119,6 +119,9 @@
           <width>300</width>
           <height>16777215</height>
          </size>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
         </property>
         <property name="title">
          <string>Noise</string>
@@ -303,23 +306,23 @@
         <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
           <layout class="QGridLayout" name="gridLayout_2">
-           <item row="0" column="0">
-            <widget class="QRadioButton" name="radioButton_7">
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="radioButton_10">
              <property name="text">
-              <string>Medial</string>
-             </property>
-             <property name="checked">
-              <bool>true</bool>
+              <string>Gaussian</string>
              </property>
              <attribute name="buttonGroup">
               <string notr="true">filter_radio_group</string>
              </attribute>
             </widget>
            </item>
-           <item row="3" column="0">
-            <widget class="QRadioButton" name="radioButton_10">
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="radioButton_7">
              <property name="text">
-              <string>Gaussian</string>
+              <string>Median</string>
+             </property>
+             <property name="checked">
+              <bool>false</bool>
              </property>
              <attribute name="buttonGroup">
               <string notr="true">filter_radio_group</string>
@@ -336,27 +339,7 @@
              </attribute>
             </widget>
            </item>
-           <item row="1" column="0">
-            <widget class="QRadioButton" name="radioButton_8">
-             <property name="text">
-              <string>Bilateral</string>
-             </property>
-             <attribute name="buttonGroup">
-              <string notr="true">filter_radio_group</string>
-             </attribute>
-            </widget>
-           </item>
-           <item row="4" column="0">
-            <widget class="QRadioButton" name="radioButton_11">
-             <property name="text">
-              <string>Max</string>
-             </property>
-             <attribute name="buttonGroup">
-              <string notr="true">filter_radio_group</string>
-             </attribute>
-            </widget>
-           </item>
-           <item row="0" column="1">
+           <item row="2" column="1">
             <widget class="QRadioButton" name="radioButton_12">
              <property name="text">
               <string>Min</string>
@@ -367,24 +350,26 @@
             </widget>
            </item>
            <item row="1" column="1">
-            <widget class="QRadioButton" name="radioButton">
+            <widget class="QRadioButton" name="radioButton_11">
              <property name="text">
-              <string>Midpoint</string>
+              <string>Max</string>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">filter_radio_group</string>
+             </attribute>
             </widget>
            </item>
-           <item row="2" column="1">
-            <widget class="QRadioButton" name="radioButton_2">
+           <item row="0" column="1">
+            <widget class="QRadioButton" name="radioButton_8">
              <property name="text">
-              <string>Wiener</string>
+              <string>Bilateral</string>
              </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QRadioButton" name="radioButton_3">
-             <property name="text">
-              <string>Inverse</string>
+             <property name="checked">
+              <bool>true</bool>
              </property>
+             <attribute name="buttonGroup">
+              <string notr="true">filter_radio_group</string>
+             </attribute>
             </widget>
            </item>
           </layout>
@@ -397,42 +382,114 @@
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>First property:</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_4">
+           <item>
+            <widget class="QLabel" name="filterPropDisp1_label">
+             <property name="text">
+              <string>d =</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="filterProp1_label">
+             <property name="text">
+              <string>15</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_5">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
          <item>
-          <widget class="QSlider" name="horizontalSlider_3">
+          <widget class="QSlider" name="filterProp1_slider">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label_4">
-           <property name="text">
-            <string>Second property:</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_5">
+           <item>
+            <widget class="QLabel" name="filterPropDisp2_label">
+             <property name="text">
+              <string>Sigma color =</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="filterProp2_label">
+             <property name="text">
+              <string>75</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_6">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
          <item>
-          <widget class="QSlider" name="horizontalSlider_4">
+          <widget class="QSlider" name="filterProp2_slider">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label_5">
-           <property name="text">
-            <string>Third property:</string>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_6">
+           <item>
+            <widget class="QLabel" name="filterPropDisp3_label">
+             <property name="text">
+              <string>Sigma space =</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="filterProp3_label">
+             <property name="text">
+              <string>75</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_7">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
          <item>
-          <widget class="QSlider" name="horizontalSlider_5">
+          <widget class="QSlider" name="filterProp3_slider">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -454,7 +511,7 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_7">
          <item>
-          <widget class="QPushButton" name="pushButton">
+          <widget class="QPushButton" name="browse_button">
            <property name="maximumSize">
             <size>
              <width>100</width>
@@ -516,7 +573,7 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="noise_radio_group"/>
   <buttongroup name="filter_radio_group"/>
+  <buttongroup name="noise_radio_group"/>
  </buttongroups>
 </ui>
