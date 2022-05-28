@@ -1,8 +1,10 @@
 import sys
 import os
 from filters import noise_gaussian, noise_gamma, noise_rayleigh, noise_uniform, noise_exponential, noise_salt_pepper
-from filters import median_filter, gaussian_filter, bilateral_filter, arithmatic_mean_filter, max_filter, min_filter
-from PyQt5.QtWidgets import QMainWindow, QApplication, QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QButtonGroup, QSlider, QFileDialog, QPushButton
+#from filters import median_filter, gaussian_filter, bilateral_filter, arithmatic_mean_filter, max_filter, min_filter, jpeg_comp
+from filters import *
+from PyQt5.QtWidgets import QMainWindow, QApplication, QLabel, QListWidget, QListWidgetItem,\
+    QVBoxLayout, QButtonGroup, QSlider, QFileDialog, QPushButton, QTabWidget
 from PyQt5 import QtGui, uic
 from PyQt5.QtGui import QImage, QPixmap
 import cv2 as cv
@@ -17,6 +19,7 @@ def cv2qim(image):
 class NoiseRestorationAPP(QMainWindow):
     noise_signal = pyqtSignal(int, int, int)
     restored_signal = pyqtSignal(int, int, int)
+    compress_signal = pyqtSignal(int, int)
 
     def __init__(self):
         super().__init__()
@@ -52,6 +55,14 @@ class NoiseRestorationAPP(QMainWindow):
         self.filterProp2_slider = self.findChild(QSlider, 'filterProp2_slider')
         self.filterProp3_slider = self.findChild(QSlider, 'filterProp3_slider')
         self.browse_button = self.findChild(QPushButton, 'browse_button')
+        self.tabWidget = self.findChild(QTabWidget, 'tabWidget')
+        self.compressed_label = self.findChild(QLabel, "compressed_label")
+        self.quant_label = self.findChild(QLabel, "quant_label")
+        self.block_label = self.findChild(QLabel, "block_label")
+        self.quant_slider = self.findChild(QSlider, 'quant_slider')
+        self.block_slider = self.findChild(QSlider, 'block_slider')
+        self.noisyTitle_label = self.findChild(QLabel, 'noisyTitle_label')
+        self.restoredTitle_label = self.findChild(QLabel, 'restoredTitle_label')
 
         # connecting signals
         self.images_list.itemClicked.connect(self.update_original)
@@ -65,9 +76,46 @@ class NoiseRestorationAPP(QMainWindow):
         self.filterProp2_slider.valueChanged.connect(self.restored_slider_moved)
         self.filterProp3_slider.valueChanged.connect(self.restored_slider_moved)
         self.browse_button.clicked.connect(self.load)
+        self.tabWidget.currentChanged.connect(self.change_tab_index_event)
+        self.quant_slider.valueChanged.connect(self.compress)
+        self.block_slider.valueChanged.connect(self.compress)
 
         # initial functions
         self.populate_list("images\\")
+
+    def change_tab_index_event(self, index):
+        if index == 1:
+            self.noisy_label.hide()
+            self.restored_label.hide()
+            self.compressed_label.show()
+            self.noisyTitle_label.hide()
+            self.restoredTitle_label.hide()
+            self.compress()
+        elif index == 0:
+            self.noisy_label.show()
+            self.restored_label.show()
+            self.compressed_label.hide()
+            self.original_label.adjustSize()
+            self.noisy_label.adjustSize()
+            self.restored_label.adjustSize()
+            self.noisyTitle_label.show()
+            self.restoredTitle_label.show()
+            self.showNormal()
+            self.showMaximized()
+
+    def compress(self):
+        item = self.images_list.currentItem()
+        image = item.data(Qt.UserRole)
+        quantization = int(self.quant_label.text())
+        block = int(self.block_label.text())
+
+        compressed = jpeg_comp(image, quantization, block)
+
+        q_image = cv2qim(compressed)
+        if q_image.height() > self.img_height:
+            q_image = q_image.scaledToHeight(self.img_height)
+
+        self.compressed_label.setPixmap(QPixmap(q_image))
 
     def update_original(self):
         item = self.images_list.currentItem()
@@ -79,6 +127,8 @@ class NoiseRestorationAPP(QMainWindow):
 
         self.original_label.setPixmap(QPixmap(q_image))
         self.noise_slider_moved()
+        if self.tabWidget.currentIndex() == 1:
+            self.compress()
 
     def noise_slider_moved(self):
         filter = self.noise_radio_group.checkedId()
@@ -407,11 +457,13 @@ class NoiseRestorationAPP(QMainWindow):
         self.images_list.setCurrentItem(self.images_list.item(0))
         self.update_original()
         self.noise_signal.emit(-2, 0, 0)
+        self.compressed_label.hide()
         self.showMaximized()
 
     def load(self):
         file = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         self.populate_list(file)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

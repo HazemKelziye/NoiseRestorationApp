@@ -1,25 +1,11 @@
-from scipy import fftpack
-import matplotlib.pyplot as plt
-from scipy import signal
-from skimage import color, data, restoration
+import scipy.fftpack as fftpack
+import zlib
 import cv2 as cv
 import random
 import numpy as np
-import numpy.fft as fp
 from PIL import Image, ImageFilter
-from skimage.color import rgb2gray
-import PyQt5
-from PyQt5.QtWidgets import QMainWindow, QStatusBar, QApplication, QLabel, QRadioButton
-from PyQt5.QtGui import QImage, QPixmap
 
 np.seterr(divide='ignore', invalid='ignore')
-
-def cv2qim(image):
-    height, width, channel = image.shape
-    bytesPerLine = 3 * width
-    q_image = QImage(image.data,width, height, bytesPerLine, QImage.Format_RGB888)
-    return q_image
-
 
 #Degradation (adding noise)
 
@@ -33,8 +19,8 @@ def noise_gaussian(image, mean, var):
     return noisy
 
 #prob [0.00, 1.00] increments of 0.01
-def noise_salt_pepper(img, prob):
-    image = img
+def noise_salt_pepper(image, prob):
+
     threshold = 1 - prob
 
     for i in range(0, image.shape[0]):
@@ -51,7 +37,6 @@ def noise_salt_pepper(img, prob):
 
             else:
                 image[i][j] = image[i][j]
-
     return image
 
 #mean [0, 10] increments of 0.1
@@ -127,51 +112,126 @@ def min_filter(image, kSize=3):
     filtered = Pimage.filter(ImageFilter.MinFilter(size=kSize))
     return np.array(filtered)
 
-# n = [1,10] increments of +1, constant = [0.01, 0.2] increments of +0.01
-def wiener_filter(image, n=5, constant=0.05):
-    rng = np.random.default_rng()
-    image1 = color.rgb2gray(image)
-    psf = np.ones((n, n)) / n**2
-    image1 = signal.convolve2d(image1, psf, 'same')
-    image1 += constant * image1.std() * rng.standard_normal(image1.shape)
-    image2, _ = restoration.unsupervised_wiener(image1, psf)
-    return image2
+
+class jpeg:
+
+    def __init__(self, im, quants):
+        self.image = im
+        self.quants = quants
+        self.output = None
+        super().__init__()
+
+    def encode_quant(self, quant):
+        return (self.enc / quant).astype(int)
+
+    def decode_quant(self, quant):
+        return (self.encq * quant).astype(float)
+
+    def encode_dct(self, bx, by):
+        new_shape = (
+            self.image.shape[0] // bx * bx,
+            self.image.shape[1] // by * by,
+            3
+        )
+        new = self.image[
+              :new_shape[0],
+              :new_shape[1]
+              ].reshape((
+            new_shape[0] // bx,
+            bx,
+            new_shape[1] // by,
+            by,
+            3
+        ))
+        return fftpack.dctn(new, axes=[1, 3], norm='ortho')
+
+    def decode_dct(self, bx, by):
+        return fftpack.idctn(self.decq, axes=[1, 3], norm='ortho'
+                             ).reshape((
+            self.decq.shape[0] * bx,
+            self.decq.shape[2] * by,
+            3
+        ))
+
+    def encode_zip(self):
+        return zlib.compress(self.encq.astype(np.int8).tobytes())
+
+    def decode_zip(self):
+        return np.frombuffer(zlib.decompress(self.encz), dtype=np.int8).astype(float).reshape(self.encq.shape)
+
+    def intiate(self, qscale, bx, by):
+        quant = (
+            (np.ones((bx, by)) * (qscale * qscale))
+                .clip(-100, 100)  # to prevent clipping
+                .reshape((1, bx, 1, by, 1))
+        )
+        self.enc = self.encode_dct(bx, by)
+        self.encq = self.encode_quant(quant)
+        self.encz = self.encode_zip()
+        self.decz = self.decode_zip()
+        self.decq = self.decode_quant(quant)
+        self.dec = self.decode_dct(bx, by)
+        img_bgr = ycbcr2rgb(self.dec)
+        self.output = img_bgr.astype(np.uint8)
+        return
 
 
-#garbage in garbage out functions
-def blur_kernel(image):
-    image1 = 255.0 * cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    gauss_kernel = np.outer(signal.gaussian(image1.shape[0], 3), signal.gaussian(image1.shape[1], 3))
-    freq = fp.fft2(image1)
-    freq_kernel = fp.fft2(fp.ifftshift(gauss_kernel)) #This is our H
-    convolved = freq_kernel * freq #by convolution theorem
-    im_blur = fp.ifft2(convolved).real
-    im_blur = 255 * im_blur / np.max(im_blur)
-    return im_blur
-def inverse_filter(image):
-    image = 255.0 * cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    epsilon = 0.000001
-    gauss_kernel = np.outer(signal.gaussian(image.shape[0], 3), signal.gaussian(image.shape[1], 3))
-    freq_kernel = np.fft.fft2(np.fft.ifftshift(gauss_kernel))
-    freq = fp.fft2(image)
-    freq_kernel = 1 / (epsilon + freq_kernel)
-    convolved = freq*freq_kernel
-    im_restored = fp.ifft2(convolved).real
-    im_restored = 255 * im_restored / np.max(im_restored)
-    return im_restored
-def denoising_fft(image, keep_fraction=0.1):
-    image1 = image.astype(float)
-    im_fft = fftpack.fft2(image1)
-    im_fft2 = im_fft
-    r, c, channel = image1.shape
-    im_fft2[int(r*keep_fraction):int(r*(1-keep_fraction))] = 0
-    im_fft2[:, int(c*keep_fraction):int(c*(1-keep_fraction))] = 0
-    im_new = fftpack.ifft2(im_fft2).real
-    return np.uint8(im_new)
-def notch_filter(image):
-    im = np.mean(image, axis=2)/255
-    F1 = fftpack.fft2((im.astype(float)))
-    F2 = fftpack.fftshift(F1)
-    F2[170:176, :220] = F2[170:176, 230:] = 0 #Elimnating the frequencies most likely responsible for noise(keep Low Freq)
-    im1 = fftpack.ifft2(fftpack.ifftshift(F2)).real
-    return im1
+def rgb2ycbcr(im_rgb):
+    im_rgb = im_rgb.astype(np.float32)
+    im_ycrcb = cv.cvtColor(im_rgb, cv.COLOR_RGB2YCR_CB)
+    im_ycbcr = im_ycrcb[:, :, (0, 2, 1)].astype(np.float32)
+    im_ycbcr[:, :, 0] = (im_ycbcr[:, :, 0] * (235 - 16) + 16) / \
+                        255.0  # to [16/255, 235/255]
+    im_ycbcr[:, :, 1:] = (im_ycbcr[:, :, 1:] * (240 - 16) + 16) / \
+                         255.0  # to [16/255, 240/255]
+    return im_ycbcr
+
+def ycbcr2rgb(im_ycbcr):
+    im_ycbcr = im_ycbcr.astype(np.float32)
+    im_ycbcr[:, :, 0] = (im_ycbcr[:, :, 0] * 255.0 - 16) / (235 - 16)  # to [0, 1]
+    im_ycbcr[:, :, 1:] = (im_ycbcr[:, :, 1:] * 255.0 - 16) / (240 - 16)  # to [0, 1]
+    im_ycrcb = im_ycbcr[:, :, (0, 2, 1)].astype(np.float32)
+    im_rgb = cv.cvtColor(im_ycrcb, cv.COLOR_YCR_CB2RGB)
+    return im_rgb
+
+def runLengthEncoding(message):
+    encoded_message = []
+    i = 0
+
+    while (i <= len(message) - 1):
+        count = 1
+        ch = message[i]
+        j = i
+        while (j < len(message) - 1):
+            if (message[j] == message[j + 1]):
+                count = count + 1
+                j = j + 1
+            else:
+                break
+        encoded_message.append(ch)
+        encoded_message.append(count)
+        i = j + 1
+    return encoded_message
+
+def runLengthDecoding(input):
+    ans = []
+    for i in (0, len(input) - 2, 2):
+
+        for j in (1, input[i + 1]):
+            ans.append(input[i])
+    return ans
+
+#Our holy grail Function
+def jpeg_comp(image, quant_size=2, block_size=3):
+    Ycr = rgb2ycbcr(image)
+    obj = jpeg(Ycr, [5])
+    quants = [quant_size]
+    blocks = [(block_size, block_size)]
+    for qscale in quants:
+        for bx, by in blocks:
+            obj.intiate(qscale, bx, by)
+    return obj.output
+
+# image = cv.imread('/Users/hazemkilzieh/PycharmProjects/NoiseRestoration/Images/sample.bmp')
+# cv.imshow('jpeg',jpeg_comp(image))
+# cv.waitKey(0)
